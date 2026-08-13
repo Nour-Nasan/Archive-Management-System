@@ -1,12 +1,14 @@
 from pathlib import Path
 from dotenv import load_dotenv
 import os
+import dj_database_url
 
 load_dotenv()
 
 BASE_DIR = Path(__file__).resolve().parent.parent
 
 
+# ── Security ──────────────────────────────────────────────────────────────
 
 # SECRET_KEY must be set via environment variable — never hard-coded.
 SECRET_KEY = os.getenv('SECRET_KEY') or os.getenv('SESSION_SECRET')
@@ -24,13 +26,19 @@ DEBUG = os.getenv('DEBUG', 'False').lower() in ('true', '1', 'yes')
 _allowed_hosts_env = os.getenv('ALLOWED_HOSTS', '*')
 ALLOWED_HOSTS = [h.strip() for h in _allowed_hosts_env.split(',') if h.strip()]
 
+# CSRF trusted origins — always includes Replit dev domains; additional
+# origins (e.g. Render HTTPS URL) can be added via the CSRF_TRUSTED_ORIGINS
+# environment variable as a comma-separated list.
 CSRF_TRUSTED_ORIGINS = [
     'https://*.replit.dev',
     'https://*.repl.co',
 ]
+_csrf_extra = os.getenv('CSRF_TRUSTED_ORIGINS', '')
+if _csrf_extra:
+    CSRF_TRUSTED_ORIGINS += [o.strip() for o in _csrf_extra.split(',') if o.strip()]
 
 
-# Application definition
+# ── Application definition ────────────────────────────────────────────────
 
 INSTALLED_APPS = [
     'django.contrib.admin',
@@ -48,6 +56,9 @@ INSTALLED_APPS = [
 
 MIDDLEWARE = [
     'django.middleware.security.SecurityMiddleware',
+    # WhiteNoise serves static files efficiently in production.
+    # Must be placed directly after SecurityMiddleware.
+    'whitenoise.middleware.WhiteNoiseMiddleware',
     'django.contrib.sessions.middleware.SessionMiddleware',
     'django.middleware.common.CommonMiddleware',
     'django.middleware.csrf.CsrfViewMiddleware',
@@ -73,51 +84,53 @@ TEMPLATES = [
     },
 ]
 
-
 WSGI_APPLICATION = 'archive_project.wsgi.application'
 
 
-DATABASES = {
-    'default': {
-        'ENGINE': 'django.db.backends.sqlite3',
-        'NAME': BASE_DIR / 'db.sqlite3',
+# ── Database ──────────────────────────────────────────────────────────────
+# Uses DATABASE_URL (PostgreSQL) only when DEBUG=False (production mode).
+# This prevents Replit's automatically injected DATABASE_URL from switching
+# the local dev environment away from SQLite — local dev always uses SQLite.
+# On Render: DEBUG=False and DATABASE_URL are both set, so PostgreSQL is used.
+
+_database_url = os.getenv('DATABASE_URL')
+if _database_url and not DEBUG:
+    DATABASES = {
+        'default': dj_database_url.config(
+            default=_database_url,
+            conn_max_age=600,
+            conn_health_checks=True,
+        )
     }
-}
+else:
+    DATABASES = {
+        'default': {
+            'ENGINE': 'django.db.backends.sqlite3',
+            'NAME': BASE_DIR / 'db.sqlite3',
+        }
+    }
 
 
-# Password validation
-# https://docs.djangoproject.com/en/5.2/ref/settings/#auth-password-validators
+# ── Password validation ───────────────────────────────────────────────────
 
 AUTH_PASSWORD_VALIDATORS = [
-    {
-        'NAME': 'django.contrib.auth.password_validation.UserAttributeSimilarityValidator',
-    },
-    {
-        'NAME': 'django.contrib.auth.password_validation.MinimumLengthValidator',
-    },
-    {
-        'NAME': 'django.contrib.auth.password_validation.CommonPasswordValidator',
-    },
-    {
-        'NAME': 'django.contrib.auth.password_validation.NumericPasswordValidator',
-    },
+    {'NAME': 'django.contrib.auth.password_validation.UserAttributeSimilarityValidator'},
+    {'NAME': 'django.contrib.auth.password_validation.MinimumLengthValidator'},
+    {'NAME': 'django.contrib.auth.password_validation.CommonPasswordValidator'},
+    {'NAME': 'django.contrib.auth.password_validation.NumericPasswordValidator'},
 ]
 
 
-# Internationalization
-# https://docs.djangoproject.com/en/5.2/topics/i18n/
+# ── Internationalisation ──────────────────────────────────────────────────
 
 LANGUAGE_CODE = 'en-us'
-
 TIME_ZONE = 'UTC'
-
 USE_I18N = True
-
 USE_TZ = True
 
 
-# Static files (CSS, JavaScript, Images)
-# https://docs.djangoproject.com/en/5.2/howto/static-files/
+# ── Static files ──────────────────────────────────────────────────────────
+# WhiteNoise compresses and fingerprints static files for production.
 
 STATIC_URL = 'static/'
 
@@ -126,13 +139,27 @@ STATICFILES_DIRS = [
 ]
 
 STATIC_ROOT = BASE_DIR / 'staticfiles'
-# Default primary key field type
-# https://docs.djangoproject.com/en/5.2/ref/settings/#default-auto-field
+
+STORAGES = {
+    # Default file storage for media uploads (unchanged from Django default).
+    'default': {
+        'BACKEND': 'django.core.files.storage.FileSystemStorage',
+    },
+    # WhiteNoise compresses and fingerprints static files for production.
+    'staticfiles': {
+        'BACKEND': 'whitenoise.storage.CompressedManifestStaticFilesStorage',
+    },
+}
+
+
+# ── Media files ───────────────────────────────────────────────────────────
 
 MEDIA_URL = '/media/'
 MEDIA_ROOT = BASE_DIR / 'media'
 
+
+# ── Misc ──────────────────────────────────────────────────────────────────
+
 DEFAULT_AUTO_FIELD = 'django.db.models.BigAutoField'
 AUTH_USER_MODEL = 'accounts.User'
-
-LOGIN_URL = "/login/"
+LOGIN_URL = '/login/'

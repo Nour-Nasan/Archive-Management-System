@@ -8,6 +8,9 @@ from .forms import DocumentForm, DocumentFileForm, VersionUploadForm
 from .models import Document, DocumentFile, Department, DocumentType, DocumentLog
 from .utils import log_action, diff_document
 
+from django.contrib.auth import get_user_model
+User = get_user_model()
+
 
 # ─── Helpers ──────────────────────────────────────────────────────────────────
 
@@ -28,24 +31,81 @@ def _next_version(doc):
 def document_list(request):
     qs = Document.objects.select_related('document_type', 'department', 'created_by')
 
-    q = request.GET.get('q', '').strip()
-    dept_id = request.GET.get('department', '')
-    dtype_id = request.GET.get('document_type', '')
+    # ── Collect filter params ────────────────────────────────────────────
+    f_number      = request.GET.get('doc_number',     '').strip()
+    f_title       = request.GET.get('title',          '').strip()
+    f_description = request.GET.get('description',    '').strip()
+    f_dept        = request.GET.get('department',     '').strip()
+    f_dtype       = request.GET.get('document_type',  '').strip()
+    f_status      = request.GET.get('status',         '').strip()
+    f_date_from   = request.GET.get('date_from',      '').strip()
+    f_date_to     = request.GET.get('date_to',        '').strip()
+    f_created_by  = request.GET.get('created_by',     '').strip()
 
-    if q:
-        qs = qs.filter(Q(title__icontains=q) | Q(document_number__icontains=q))
-    if dept_id:
-        qs = qs.filter(department_id=dept_id)
-    if dtype_id:
-        qs = qs.filter(document_type_id=dtype_id)
+    # Legacy single-box search kept for any existing bookmarks
+    f_q           = request.GET.get('q',              '').strip()
+
+    # ── Apply filters (AND logic; each ignored when empty) ───────────────
+    if f_q:
+        qs = qs.filter(
+            Q(title__icontains=f_q) |
+            Q(document_number__icontains=f_q) |
+            Q(description__icontains=f_q)
+        )
+    if f_number:
+        qs = qs.filter(document_number__icontains=f_number)
+    if f_title:
+        qs = qs.filter(title__icontains=f_title)
+    if f_description:
+        qs = qs.filter(description__icontains=f_description)
+    if f_dept:
+        qs = qs.filter(department_id=f_dept)
+    if f_dtype:
+        qs = qs.filter(document_type_id=f_dtype)
+    if f_status:
+        qs = qs.filter(status=f_status)
+    if f_date_from:
+        try:
+            qs = qs.filter(document_date__gte=f_date_from)
+        except (ValueError, TypeError):
+            pass
+    if f_date_to:
+        try:
+            qs = qs.filter(document_date__lte=f_date_to)
+        except (ValueError, TypeError):
+            pass
+    if f_created_by:
+        qs = qs.filter(created_by_id=f_created_by)
+
+    # Guarantee no accidental duplicates (safe even without distinct())
+    qs = qs.distinct()
+
+    is_filtered = any([
+        f_q, f_number, f_title, f_description, f_dept, f_dtype,
+        f_status, f_date_from, f_date_to, f_created_by,
+    ])
 
     context = {
-        'documents': qs,
-        'departments': Department.objects.all(),
-        'document_types': DocumentType.objects.all(),
-        'q': q,
-        'selected_dept': dept_id,
-        'selected_dtype': dtype_id,
+        'documents':       qs,
+        'result_count':    qs.count(),
+        'is_filtered':     is_filtered,
+        # Drop-down data
+        'departments':     Department.objects.order_by('name'),
+        'document_types':  DocumentType.objects.order_by('name'),
+        'creator_users':   User.objects.filter(
+                               created_documents__isnull=False
+                           ).distinct().order_by('username'),
+        'status_choices':  Document.STATUS_CHOICES,
+        # Current filter values (echoed back to form)
+        'f_number':      f_number,
+        'f_title':       f_title,
+        'f_description': f_description,
+        'f_dept':        f_dept,
+        'f_dtype':       f_dtype,
+        'f_status':      f_status,
+        'f_date_from':   f_date_from,
+        'f_date_to':     f_date_to,
+        'f_created_by':  f_created_by,
     }
     return render(request, 'documents/document_list.html', context)
 

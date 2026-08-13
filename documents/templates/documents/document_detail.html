@@ -35,6 +35,7 @@
         </ol>
     </nav>
 
+    <!-- Document metadata -->
     <div class="card shadow-sm mb-4">
         <div class="card-header bg-white d-flex justify-content-between align-items-center">
             <h5 class="mb-0">{{ document.title }}</h5>
@@ -83,8 +84,8 @@
         </div>
     </div>
 
-    <!-- Files -->
-    <div class="card shadow-sm">
+    <!-- Attached Files -->
+    <div class="card shadow-sm mb-4">
         <div class="card-header bg-white d-flex justify-content-between align-items-center">
             <h6 class="mb-0">Attached Files</h6>
             <a href="{% url 'documents:document_edit' document.pk %}" class="btn btn-sm btn-outline-primary">Upload New Version</a>
@@ -108,15 +109,7 @@
                     <tr>
                         <td>{{ f.original_name }}</td>
                         <td>{{ f.file_type|upper|default:"—" }}</td>
-                        <td>
-                            {% if f.file_size %}
-                                {% if f.file_size >= 1048576 %}
-                                    {{ f.file_size|filesizeformat }}
-                                {% else %}
-                                    {{ f.file_size|filesizeformat }}
-                                {% endif %}
-                            {% else %}—{% endif %}
-                        </td>
+                        <td>{% if f.file_size %}{{ f.file_size|filesizeformat }}{% else %}—{% endif %}</td>
                         <td>v{{ f.version }}</td>
                         <td>{{ f.uploaded_by|default:"—" }}</td>
                         <td>{{ f.uploaded_at|date:"Y-m-d H:i" }}</td>
@@ -129,8 +122,45 @@
             </table>
             {% else %}
             <div class="text-center py-4 text-muted">
-                No files attached.
-                <a href="{% url 'documents:document_edit' document.pk %}">Upload one</a>
+                No files attached. <a href="{% url 'documents:document_edit' document.pk %}">Upload one</a>
+            </div>
+            {% endif %}
+        </div>
+    </div>
+
+    <!-- Movement History -->
+    <div class="card shadow-sm mb-4">
+        <div class="card-header bg-white d-flex justify-content-between align-items-center">
+            <h6 class="mb-0">Movement History</h6>
+            <span class="badge bg-secondary">{{ logs|length }} event{{ logs|length|pluralize }}</span>
+        </div>
+        <div class="card-body p-0">
+            {% if logs %}
+            <div class="list-group list-group-flush">
+                {% for entry in logs %}
+                <div class="list-group-item px-3 py-3">
+                    <div class="d-flex justify-content-between align-items-start gap-2">
+                        <div class="flex-grow-1">
+                            <span class="badge {{ entry.badge_class }} me-2">
+                                {{ entry.get_action_display }}
+                            </span>
+                            <span class="fw-semibold small">
+                                {{ entry.user.get_full_name|default:entry.user.username|default:"Unknown user" }}
+                            </span>
+                            {% if entry.details %}
+                            <div class="mt-1 text-muted small" style="white-space: pre-line;">{{ entry.details }}</div>
+                            {% endif %}
+                        </div>
+                        <div class="text-muted small text-nowrap">
+                            {{ entry.timestamp|date:"Y-m-d H:i" }}
+                        </div>
+                    </div>
+                </div>
+                {% endfor %}
+            </div>
+            {% else %}
+            <div class="text-center py-4 text-muted small">
+                No activity recorded yet.
             </div>
             {% endif %}
         </div>

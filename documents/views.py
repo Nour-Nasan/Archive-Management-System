@@ -5,7 +5,8 @@ from django.db.models import Q
 from django.shortcuts import render, get_object_or_404, redirect
 
 from .forms import DocumentForm, DocumentFileForm
-from .models import Document, DocumentFile, Department, DocumentType
+from .models import Document, DocumentFile, Department, DocumentType, DocumentLog
+from .utils import log_action, diff_document
 
 
 @login_required
@@ -44,8 +45,21 @@ def document_create(request):
             doc.created_by = request.user
             doc.save()
 
+            # ── Audit: document created ──────────────────────────────────
+            details_parts = [
+                f'Title: {doc.title}',
+                f'Document Number: {doc.document_number}',
+                f'Type: {doc.document_type or "—"}',
+                f'Department: {doc.department or "—"}',
+                f'Status: {doc.get_status_display()}',
+            ]
+            log_action(doc, request.user, DocumentLog.ACTION_CREATED,
+                       '\n'.join(details_parts))
+
             uploaded = request.FILES.get('file')
             if uploaded:
+                next_version = (doc.files.order_by('-version')
+                                .values_list('version', flat=True).first() or 0) + 1
                 DocumentFile.objects.create(
                     document=doc,
                     file=uploaded,
@@ -53,8 +67,12 @@ def document_create(request):
                     file_type=os.path.splitext(uploaded.name)[1].lstrip('.').lower(),
                     file_size=uploaded.size,
                     uploaded_by=request.user,
-                    version=1,
+                    version=next_version,
                 )
+                # ── Audit: file uploaded with initial create ─────────────
+                log_action(doc, request.user, DocumentLog.ACTION_FILE_UPLOADED,
+                           f'File: {uploaded.name} (v{next_version}, '
+                           f'{uploaded.size} bytes)')
 
             messages.success(request, 'Document created successfully.')
             return redirect('documents:document_detail', pk=doc.pk)
@@ -76,21 +94,77 @@ def document_detail(request, pk):
         pk=pk,
     )
     files = doc.files.select_related('uploaded_by').all()
-    return render(request, 'documents/document_detail.html', {'document': doc, 'files': files})
+
+    # Movement history — managers and superusers see it; employees also see it
+    # because they already have access to this document (login_required is the gate)
+    logs = (
+        doc.logs
+        .select_related('user')
+        .order_by('-timestamp')
+    )
+
+    return render(request, 'documents/document_detail.html', {
+        'document': doc,
+        'files': files,
+        'logs': logs,
+    })
 
 
 @login_required
 def document_edit(request, pk):
     doc = get_object_or_404(Document, pk=pk)
     if request.method == 'POST':
+        # ── Snapshot BEFORE save ─────────────────────────────────────────
+        old = {
+            'title': doc.title,
+            'document_number': doc.document_number,
+            'description': doc.description or '',
+            'document_date': str(doc.document_date),
+            'status': doc.status,
+            'document_type_id': doc.document_type_id,
+            'department_id': doc.department_id,
+            '__document_type_name': str(doc.document_type) if doc.document_type else '—',
+            '__department_name': str(doc.department) if doc.department else '—',
+        }
+        old_status = doc.status
+
         form = DocumentForm(request.POST, instance=doc)
         file_form = DocumentFileForm(request.POST, request.FILES)
         if form.is_valid() and file_form.is_valid():
             form.save()
+            doc.refresh_from_db()
 
+            # ── Compute field-level diff ─────────────────────────────────
+            new_data = {
+                'title': doc.title,
+                'document_number': doc.document_number,
+                'description': doc.description or '',
+                'document_date': str(doc.document_date),
+                'status': doc.status,
+                'document_type_id': doc.document_type_id,
+                'department_id': doc.department_id,
+                'document_type': doc.document_type,
+                'department': doc.department,
+            }
+            changes, status_changed = diff_document(old, new_data, doc)
+
+            # ── Audit: edited ────────────────────────────────────────────
+            if changes:
+                log_action(doc, request.user, DocumentLog.ACTION_EDITED,
+                           '\n'.join(changes))
+
+            # ── Audit: status changed (separate entry for clarity) ────────
+            if status_changed:
+                old_label = dict(Document.STATUS_CHOICES).get(old_status, old_status)
+                new_label = doc.get_status_display()
+                log_action(doc, request.user, DocumentLog.ACTION_STATUS_CHANGED,
+                           f'Status changed from "{old_label}" to "{new_label}"')
+
+            # ── File upload ──────────────────────────────────────────────
             uploaded = request.FILES.get('file')
             if uploaded:
-                next_version = (doc.files.order_by('-version').values_list('version', flat=True).first() or 0) + 1
+                next_version = (doc.files.order_by('-version')
+                                .values_list('version', flat=True).first() or 0) + 1
                 DocumentFile.objects.create(
                     document=doc,
                     file=uploaded,
@@ -100,6 +174,10 @@ def document_edit(request, pk):
                     uploaded_by=request.user,
                     version=next_version,
                 )
+                # ── Audit: new file version ──────────────────────────────
+                log_action(doc, request.user, DocumentLog.ACTION_FILE_UPLOADED,
+                           f'File: {uploaded.name} (v{next_version}, '
+                           f'{uploaded.size} bytes)')
 
             messages.success(request, 'Document updated successfully.')
             return redirect('documents:document_detail', pk=doc.pk)
@@ -119,6 +197,9 @@ def document_edit(request, pk):
 def document_delete(request, pk):
     doc = get_object_or_404(Document, pk=pk)
     if request.method == 'POST':
+        # ── Audit: log BEFORE deletion so we capture the event ───────────
+        log_action(doc, request.user, DocumentLog.ACTION_DELETED,
+                   f'Document "{doc.title}" ({doc.document_number}) permanently deleted.')
         doc.delete()
         messages.success(request, 'Document deleted.')
         return redirect('documents:document_list')

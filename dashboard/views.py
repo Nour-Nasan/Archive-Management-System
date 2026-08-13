@@ -1,8 +1,9 @@
 from django.contrib.auth.decorators import login_required
+from django.core.paginator import Paginator
 from django.db.models import Count, Q
 from django.shortcuts import render
 
-from accounts.decorators import manager_required
+from accounts.decorators import manager_required, superuser_required
 from accounts.models import User
 from documents.models import Document, DocumentFile, Department, DocumentType, DocumentLog
 
@@ -16,6 +17,73 @@ def manager_dashboard(request):
 @login_required
 def employee_dashboard(request):
     return render(request, 'dashboard/employee_dashboard.html')
+
+
+@login_required
+@superuser_required
+def audit_log(request):
+    qs = DocumentLog.objects.select_related('user', 'document').order_by('-timestamp')
+
+    # ── Filters ───────────────────────────────────────────────────────────
+    f_action   = request.GET.get('action',   '').strip()
+    f_user     = request.GET.get('user',     '').strip()
+    f_keyword  = request.GET.get('keyword',  '').strip()
+    f_date_from = request.GET.get('date_from', '').strip()
+    f_date_to   = request.GET.get('date_to',   '').strip()
+
+    if f_action:
+        qs = qs.filter(action=f_action)
+    if f_user:
+        qs = qs.filter(user_id=f_user)
+    if f_keyword:
+        qs = qs.filter(
+            Q(document_number__icontains=f_keyword) |
+            Q(document_title__icontains=f_keyword)
+        )
+    if f_date_from:
+        try:
+            qs = qs.filter(timestamp__date__gte=f_date_from)
+        except (ValueError, TypeError):
+            f_date_from = ''
+    if f_date_to:
+        try:
+            qs = qs.filter(timestamp__date__lte=f_date_to)
+        except (ValueError, TypeError):
+            f_date_to = ''
+
+    is_filtered = any([f_action, f_user, f_keyword, f_date_from, f_date_to])
+    total_count = qs.count()
+
+    # ── Pagination (50 per page) ──────────────────────────────────────────
+    paginator   = Paginator(qs, 50)
+    page_number = request.GET.get('page', 1)
+    page_obj    = paginator.get_page(page_number)
+
+    # Preserve filter params in pagination links
+    filter_params = request.GET.copy()
+    filter_params.pop('page', None)
+
+    context = {
+        'page_obj':      page_obj,
+        'total_count':   total_count,
+        'is_filtered':   is_filtered,
+        'filter_params': filter_params.urlencode(),
+        # Filter state
+        'f_action':    f_action,
+        'f_user':      f_user,
+        'f_keyword':   f_keyword,
+        'f_date_from': f_date_from,
+        'f_date_to':   f_date_to,
+        # Drop-down data
+        'action_choices': DocumentLog.ACTION_CHOICES,
+        'log_users': (
+            User.objects
+            .filter(document_logs__isnull=False)
+            .distinct()
+            .order_by('username')
+        ),
+    }
+    return render(request, 'dashboard/audit_log.html', context)
 
 
 @login_required

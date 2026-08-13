@@ -38,6 +38,24 @@
             </div>
         </div>
 
+        {% if request.user.is_superuser %}
+        <div class="col-md-4">
+            <div class="card shadow-sm h-100 border-dark">
+                <div class="card-body">
+                    <h6 class="card-title text-muted text-uppercase small fw-bold mb-3">System Administration</h6>
+                    <div class="d-grid gap-2">
+                        <a href="{% url 'accounts:user_list' %}" class="btn btn-outline-dark">
+                            👥 Manage Users
+                        </a>
+                        <a href="/admin/" class="btn btn-outline-secondary">
+                            ⚙️ Django Admin
+                        </a>
+                    </div>
+                </div>
+            </div>
+        </div>
+        {% endif %}
+
     </div>
 </div>
 

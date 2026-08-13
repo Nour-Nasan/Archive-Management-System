@@ -21,6 +21,15 @@ class Role(models.Model):
 
 
 class User(AbstractUser):
+    APPROVAL_PENDING = 'pending'
+    APPROVAL_APPROVED = 'approved'
+    APPROVAL_REJECTED = 'rejected'
+    APPROVAL_CHOICES = [
+        (APPROVAL_PENDING, 'Pending'),
+        (APPROVAL_APPROVED, 'Approved'),
+        (APPROVAL_REJECTED, 'Rejected'),
+    ]
+
     email = models.EmailField(unique=True)
     phone_number = models.CharField(max_length=32, blank=True, null=True)
     department = models.CharField(max_length=100, blank=True, null=True)
@@ -35,17 +44,29 @@ class User(AbstractUser):
         related_name='users'
     )
 
+    # Approval workflow — default 'approved' preserves all existing accounts
+    approval_status = models.CharField(
+        max_length=20,
+        choices=APPROVAL_CHOICES,
+        default=APPROVAL_APPROVED,
+    )
+
     created_at = models.DateTimeField(auto_now_add=True)
     updated_at = models.DateTimeField(auto_now=True)
 
     REQUIRED_FIELDS = ['email']
 
     def is_manager(self):
+        """Superusers always count as managers."""
         return self.is_superuser or (self.role and self.role.name.lower() == 'manager')
 
     def is_employee(self):
         return self.role and self.role.name.lower() == 'employee'
 
+    def is_approved(self):
+        """Superusers are always considered approved."""
+        return self.is_superuser or self.approval_status == self.APPROVAL_APPROVED
+
     def __str__(self):
-        role_name = self.role.name if self.role else "No Role"
+        role_name = self.role.name if self.role else 'No Role'
         return f"{self.username} ({role_name})"

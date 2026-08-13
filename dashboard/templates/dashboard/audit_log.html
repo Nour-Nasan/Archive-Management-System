@@ -1,220 +1,131 @@
-<!DOCTYPE html>
-<html lang="en">
-<head>
-    <meta charset="UTF-8">
-    <title>Global Audit Log | Archive System</title>
-    <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/css/bootstrap.min.css" rel="stylesheet">
-</head>
-<body class="bg-light">
+{% extends "base.html" %}
+{% block title %}Global Audit Log | Archive System{% endblock %}
 
-<nav class="navbar navbar-expand-lg navbar-dark bg-dark mb-4">
-    <div class="container-fluid px-4">
-        <a class="navbar-brand" href="#">Archive System</a>
-        <div class="ms-auto d-flex align-items-center gap-3">
-            <span class="text-light">{{ request.user.username }}</span>
-            <a href="{% url 'accounts:logout' %}" class="btn btn-outline-light btn-sm">Logout</a>
+{% block content %}
+<div class="page-header">
+    <div>
+        <h1 class="page-header-title">Global Audit Log</h1>
+        <div class="page-header-sub">
+            {% if is_filtered %}Showing filtered results — {{ total_count }} event{{ total_count|pluralize }}
+            {% else %}All activity — {{ total_count }} event{{ total_count|pluralize }} total{% endif %}
         </div>
     </div>
-</nav>
-
-<div class="container-fluid px-4">
-
-    <!-- ── Header ─────────────────────────────────────────────────────── -->
-    <div class="d-flex justify-content-between align-items-center mb-3">
-        <div>
-            <h5 class="mb-0">Global Audit Log</h5>
-            <small class="text-muted">
-                {% if is_filtered %}
-                    Showing filtered results — {{ total_count }} event{{ total_count|pluralize }}
-                {% else %}
-                    All activity — {{ total_count }} event{{ total_count|pluralize }} total
-                {% endif %}
-            </small>
-        </div>
-        <a href="{% url 'dashboard:manager_dashboard' %}" class="btn btn-outline-secondary btn-sm">
-            ← Dashboard
-        </a>
-    </div>
-
-    <!-- ── Filter form ────────────────────────────────────────────────── -->
-    <form method="get" class="card shadow-sm mb-3">
-        <div class="card-body py-2">
-            <div class="row g-2 align-items-end">
-
-                <div class="col-md-2">
-                    <label class="form-label fw-semibold mb-1 small">Action</label>
-                    <select name="action" class="form-select form-select-sm">
-                        <option value="">All Actions</option>
-                        {% for val, label in action_choices %}
-                            <option value="{{ val }}" {% if f_action == val %}selected{% endif %}>
-                                {{ label }}
-                            </option>
-                        {% endfor %}
-                    </select>
-                </div>
-
-                <div class="col-md-2">
-                    <label class="form-label fw-semibold mb-1 small">User</label>
-                    <select name="user" class="form-select form-select-sm">
-                        <option value="">Any User</option>
-                        {% for u in log_users %}
-                            <option value="{{ u.pk }}"
-                                {% if f_user == u.pk|stringformat:"s" %}selected{% endif %}>
-                                {{ u.username }}
-                            </option>
-                        {% endfor %}
-                    </select>
-                </div>
-
-                <div class="col-md-3">
-                    <label class="form-label fw-semibold mb-1 small">Doc Number / Title</label>
-                    <input type="text" name="keyword" value="{{ f_keyword }}"
-                           class="form-control form-control-sm"
-                           placeholder="Partial match…">
-                </div>
-
-                <div class="col-md-2">
-                    <label class="form-label fw-semibold mb-1 small">Date From</label>
-                    <input type="date" name="date_from" value="{{ f_date_from }}"
-                           class="form-control form-control-sm">
-                </div>
-
-                <div class="col-md-2">
-                    <label class="form-label fw-semibold mb-1 small">Date To</label>
-                    <input type="date" name="date_to" value="{{ f_date_to }}"
-                           class="form-control form-control-sm">
-                </div>
-
-                <div class="col-md-1 d-flex gap-1">
-                    <button type="submit" class="btn btn-primary btn-sm w-100">Go</button>
-                    <a href="{% url 'dashboard:audit_log' %}"
-                       class="btn btn-outline-secondary btn-sm w-100">✕</a>
-                </div>
-
-            </div>
-            {% if is_filtered %}
-            <div class="mt-2">
-                <span class="badge bg-primary">Filters active</span>
-                <a href="{% url 'dashboard:audit_log' %}" class="ms-2 small text-muted">Clear all</a>
-            </div>
-            {% endif %}
-        </div>
-    </form>
-
-    <!-- ── Log table ──────────────────────────────────────────────────── -->
-    <div class="card shadow-sm mb-3">
-        <div class="card-body p-0">
-            {% if page_obj %}
-            <div class="table-responsive">
-            <table class="table table-hover align-middle mb-0 small">
-                <thead class="table-light">
-                    <tr>
-                        <th class="text-nowrap">Timestamp</th>
-                        <th>Action</th>
-                        <th>Doc Number</th>
-                        <th>Doc Title</th>
-                        <th>User</th>
-                        <th>Details</th>
-                    </tr>
-                </thead>
-                <tbody>
-                    {% for entry in page_obj %}
-                    <tr>
-                        <td class="text-nowrap text-muted">
-                            {{ entry.timestamp|date:"Y-m-d H:i" }}
-                        </td>
-                        <td>
-                            <span class="badge {{ entry.badge_class }}">
-                                {{ entry.get_action_display }}
-                            </span>
-                        </td>
-                        <td>
-                            {% if entry.document %}
-                                <a href="{% url 'documents:document_detail' entry.document.pk %}"
-                                   class="font-monospace text-decoration-none fw-semibold">
-                                    {{ entry.document_number }}
-                                </a>
-                            {% else %}
-                                <span class="font-monospace text-muted">
-                                    {{ entry.document_number|default:"—" }}
-                                </span>
-                            {% endif %}
-                        </td>
-                        <td class="text-break">
-                            {{ entry.document_title|default:"—" }}
-                        </td>
-                        <td>{{ entry.user.username|default:"—" }}</td>
-                        <td class="text-muted" style="white-space: pre-line; max-width: 340px;">
-                            {{ entry.details|default:"—" }}
-                        </td>
-                    </tr>
-                    {% endfor %}
-                </tbody>
-            </table>
-            </div>
-            {% else %}
-            <div class="text-center py-5 text-muted">
-                {% if is_filtered %}
-                    No log entries match your filters.
-                    <a href="{% url 'dashboard:audit_log' %}" class="d-block mt-1 small">Clear filters</a>
-                {% else %}
-                    No activity has been recorded yet.
-                {% endif %}
-            </div>
-            {% endif %}
-        </div>
-    </div>
-
-    <!-- ── Pagination ─────────────────────────────────────────────────── -->
-    {% if page_obj.paginator.num_pages > 1 %}
-    <nav aria-label="Audit log pages">
-        <ul class="pagination pagination-sm justify-content-center">
-
-            {% if page_obj.has_previous %}
-            <li class="page-item">
-                <a class="page-link"
-                   href="?{{ filter_params }}{% if filter_params %}&{% endif %}page={{ page_obj.previous_page_number }}">
-                    &laquo; Prev
-                </a>
-            </li>
-            {% else %}
-            <li class="page-item disabled"><span class="page-link">&laquo; Prev</span></li>
-            {% endif %}
-
-            {% for num in page_obj.paginator.page_range %}
-                {% if page_obj.number == num %}
-                    <li class="page-item active"><span class="page-link">{{ num }}</span></li>
-                {% elif num >= page_obj.number|add:"-3" and num <= page_obj.number|add:"3" %}
-                    <li class="page-item">
-                        <a class="page-link"
-                           href="?{{ filter_params }}{% if filter_params %}&{% endif %}page={{ num }}">
-                            {{ num }}
-                        </a>
-                    </li>
-                {% endif %}
-            {% endfor %}
-
-            {% if page_obj.has_next %}
-            <li class="page-item">
-                <a class="page-link"
-                   href="?{{ filter_params }}{% if filter_params %}&{% endif %}page={{ page_obj.next_page_number }}">
-                    Next &raquo;
-                </a>
-            </li>
-            {% else %}
-            <li class="page-item disabled"><span class="page-link">Next &raquo;</span></li>
-            {% endif %}
-
-        </ul>
-        <p class="text-center text-muted small">
-            Page {{ page_obj.number }} of {{ page_obj.paginator.num_pages }}
-            &mdash; {{ total_count }} event{{ total_count|pluralize }} total
-        </p>
-    </nav>
-    {% endif %}
-
 </div>
 
-<script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/js/bootstrap.bundle.min.js"></script>
-</body>
-</html>
+<!-- Filters -->
+<form method="get" class="card shadow-sm mb-3">
+    <div class="card-body py-2">
+        <div class="row g-2 align-items-end">
+            <div class="col-sm-6 col-md-2">
+                <label class="form-label mb-1 small">Action</label>
+                <select name="action" class="form-select form-select-sm">
+                    <option value="">All Actions</option>
+                    {% for val, label in action_choices %}
+                        <option value="{{ val }}" {% if f_action == val %}selected{% endif %}>{{ label }}</option>
+                    {% endfor %}
+                </select>
+            </div>
+            <div class="col-sm-6 col-md-2">
+                <label class="form-label mb-1 small">User</label>
+                <select name="user" class="form-select form-select-sm">
+                    <option value="">Any User</option>
+                    {% for u in log_users %}
+                        <option value="{{ u.pk }}" {% if f_user == u.pk|stringformat:"s" %}selected{% endif %}>{{ u.username }}</option>
+                    {% endfor %}
+                </select>
+            </div>
+            <div class="col-sm-6 col-md-3">
+                <label class="form-label mb-1 small">Doc Number / Title</label>
+                <input type="text" name="keyword" value="{{ f_keyword }}" class="form-control form-control-sm" placeholder="Partial match…">
+            </div>
+            <div class="col-sm-3 col-md-2">
+                <label class="form-label mb-1 small">Date From</label>
+                <input type="date" name="date_from" value="{{ f_date_from }}" class="form-control form-control-sm">
+            </div>
+            <div class="col-sm-3 col-md-2">
+                <label class="form-label mb-1 small">Date To</label>
+                <input type="date" name="date_to" value="{{ f_date_to }}" class="form-control form-control-sm">
+            </div>
+            <div class="col-auto d-flex gap-1">
+                <button type="submit" class="btn btn-sm btn-primary">Search</button>
+                <a href="{% url 'dashboard:audit_log' %}" class="btn btn-sm btn-outline-secondary">Reset</a>
+            </div>
+        </div>
+        {% if is_filtered %}
+        <div class="mt-2">
+            <span class="badge bg-primary">Filters active</span>
+            <a href="{% url 'dashboard:audit_log' %}" class="ms-2 small text-muted">Clear all</a>
+        </div>
+        {% endif %}
+    </div>
+</form>
+
+<!-- Log table -->
+<div class="card shadow-sm mb-3">
+    <div class="card-body p-0">
+        {% if page_obj %}
+        <div class="table-responsive">
+        <table class="table table-hover align-middle mb-0 small">
+            <thead class="table-light">
+                <tr>
+                    <th class="text-nowrap">Timestamp</th>
+                    <th>Action</th>
+                    <th>Doc Number</th>
+                    <th>Doc Title</th>
+                    <th>User</th>
+                    <th>Details</th>
+                </tr>
+            </thead>
+            <tbody>
+                {% for entry in page_obj %}
+                <tr>
+                    <td class="text-muted text-nowrap">{{ entry.timestamp|date:"Y-m-d H:i" }}</td>
+                    <td><span class="badge {{ entry.badge_class }}">{{ entry.get_action_display }}</span></td>
+                    <td>
+                        {% if entry.document %}
+                            <a href="{% url 'documents:document_detail' entry.document.pk %}" class="font-monospace text-decoration-none fw-semibold">{{ entry.document_number }}</a>
+                        {% else %}
+                            <span class="font-monospace text-muted">{{ entry.document_number|default:"—" }}</span>
+                        {% endif %}
+                    </td>
+                    <td class="text-break" style="max-width:180px;">{{ entry.document_title|default:"—" }}</td>
+                    <td>{{ entry.user.username|default:"—" }}</td>
+                    <td class="text-muted" style="white-space:pre-line;max-width:300px;">{{ entry.details|default:"—" }}</td>
+                </tr>
+                {% endfor %}
+            </tbody>
+        </table>
+        </div>
+        {% else %}
+        <div class="text-center py-5 text-muted">
+            {% if is_filtered %}No log entries match your filters. <a href="{% url 'dashboard:audit_log' %}">Clear filters</a>
+            {% else %}No activity has been recorded yet.{% endif %}
+        </div>
+        {% endif %}
+    </div>
+</div>
+
+<!-- Pagination -->
+{% if page_obj.paginator.num_pages > 1 %}
+<nav>
+    <ul class="pagination pagination-sm justify-content-center mb-1">
+        {% if page_obj.has_previous %}
+        <li class="page-item"><a class="page-link" href="?{{ filter_params }}{% if filter_params %}&{% endif %}page={{ page_obj.previous_page_number }}">&laquo; Prev</a></li>
+        {% else %}<li class="page-item disabled"><span class="page-link">&laquo; Prev</span></li>{% endif %}
+
+        {% for num in page_obj.paginator.page_range %}
+            {% if page_obj.number == num %}
+                <li class="page-item active"><span class="page-link">{{ num }}</span></li>
+            {% elif num >= page_obj.number|add:"-3" and num <= page_obj.number|add:"3" %}
+                <li class="page-item"><a class="page-link" href="?{{ filter_params }}{% if filter_params %}&{% endif %}page={{ num }}">{{ num }}</a></li>
+            {% endif %}
+        {% endfor %}
+
+        {% if page_obj.has_next %}
+        <li class="page-item"><a class="page-link" href="?{{ filter_params }}{% if filter_params %}&{% endif %}page={{ page_obj.next_page_number }}">Next &raquo;</a></li>
+        {% else %}<li class="page-item disabled"><span class="page-link">Next &raquo;</span></li>{% endif %}
+    </ul>
+    <p class="text-center text-muted small">Page {{ page_obj.number }} of {{ page_obj.paginator.num_pages }} — {{ total_count }} event{{ total_count|pluralize }} total</p>
+</nav>
+{% endif %}
+{% endblock %}

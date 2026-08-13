@@ -1,0 +1,50 @@
+{% url 'dashboard:manager_dashboard' as url_dash_mgr %}
+{% url 'dashboard:employee_dashboard' as url_dash_emp %}
+{% url 'documents:document_list'   as url_docs %}
+{% url 'documents:document_create' as url_add %}
+{% url 'dashboard:reports'         as url_reports %}
+{% url 'accounts:user_list'        as url_users %}
+{% url 'dashboard:audit_log'       as url_audit %}
+
+<a href="{% if request.user.is_manager %}{{ url_dash_mgr }}{% else %}{{ url_dash_emp }}{% endif %}"
+   class="sidebar-link {% if request.path == url_dash_mgr or request.path == url_dash_emp %}active{% endif %}"
+   {% if mobile %}data-bs-dismiss="offcanvas"{% endif %}>
+    <i class="bi bi-speedometer2"></i> Dashboard
+</a>
+
+<a href="{{ url_docs }}"
+   class="sidebar-link {% if '/documents/' in request.path and request.path != url_add %}active{% endif %}"
+   {% if mobile %}data-bs-dismiss="offcanvas"{% endif %}>
+    <i class="bi bi-folder2-open"></i> Documents
+</a>
+
+{% if request.user.is_manager %}
+<a href="{{ url_add }}"
+   class="sidebar-link {% if request.path == url_add %}active{% endif %}"
+   {% if mobile %}data-bs-dismiss="offcanvas"{% endif %}>
+    <i class="bi bi-plus-circle"></i> Add Document
+</a>
+
+<a href="{{ url_reports }}"
+   class="sidebar-link {% if request.path == url_reports %}active{% endif %}"
+   {% if mobile %}data-bs-dismiss="offcanvas"{% endif %}>
+    <i class="bi bi-bar-chart-line"></i> Reports
+</a>
+{% endif %}
+
+{% if request.user.is_superuser %}
+<div class="sidebar-divider"></div>
+<div class="sidebar-section-label">System</div>
+
+<a href="{{ url_users }}"
+   class="sidebar-link {% if '/users/' in request.path %}active{% endif %}"
+   {% if mobile %}data-bs-dismiss="offcanvas"{% endif %}>
+    <i class="bi bi-people"></i> User Management
+</a>
+
+<a href="{{ url_audit }}"
+   class="sidebar-link {% if '/audit-log/' in request.path %}active{% endif %}"
+   {% if mobile %}data-bs-dismiss="offcanvas"{% endif %}>
+    <i class="bi bi-journal-text"></i> Audit Log
+</a>
+{% endif %}

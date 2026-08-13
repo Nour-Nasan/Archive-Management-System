@@ -1,97 +1,85 @@
-<!DOCTYPE html>
-<html lang="en">
-<head>
-    <meta charset="UTF-8">
-    <title>Create Account | Archive System</title>
-    <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/css/bootstrap.min.css" rel="stylesheet">
-</head>
-<body class="bg-light">
+{% extends "auth_base.html" %}
+{% block title %}Create Account | Archive System{% endblock %}
 
-<div class="container d-flex justify-content-center align-items-center py-5" style="min-height: 100vh;">
-    <div class="card shadow p-4" style="width: 480px;">
+{% block content %}
+<div class="auth-card" style="max-width: 500px;">
 
-        <h4 class="text-center mb-1">Create Account</h4>
-        <p class="text-center text-muted small mb-4">
-            Archive System &mdash; your account will need administrator approval before you can sign in.
-        </p>
+    <div class="text-center mb-4">
+        <div class="auth-logo">Archive System</div>
+        <div class="auth-logo-sub">Document Management</div>
+    </div>
 
-        <form method="post" novalidate>
-            {% csrf_token %}
+    <div class="auth-switch">
+        <div class="d-flex gap-2 justify-content-center">
+            <a href="{% url 'accounts:login' %}" class="btn btn-sm btn-outline-secondary">Sign In</a>
+            <button class="btn btn-sm btn-primary" disabled>Create Account</button>
+        </div>
+    </div>
 
-            <div class="row g-3 mb-2">
-                <div class="col-6">
-                    <label class="form-label fw-semibold">First name <span class="text-danger">*</span></label>
-                    {{ form.first_name }}
-                    {% if form.first_name.errors %}
-                        <div class="text-danger small mt-1">{{ form.first_name.errors.0 }}</div>
-                    {% endif %}
-                </div>
-                <div class="col-6">
-                    <label class="form-label fw-semibold">Last name <span class="text-danger">*</span></label>
-                    {{ form.last_name }}
-                    {% if form.last_name.errors %}
-                        <div class="text-danger small mt-1">{{ form.last_name.errors.0 }}</div>
-                    {% endif %}
-                </div>
+    <div class="mb-3">
+        <div class="auth-title">Create an account</div>
+        <div class="auth-subtitle">Your account will require administrator approval before you can sign in.</div>
+    </div>
+
+    {% if form.non_field_errors %}
+    <div class="alert alert-danger mb-3">{{ form.non_field_errors.0 }}</div>
+    {% endif %}
+
+    <form method="post" novalidate>
+        {% csrf_token %}
+
+        <div class="row g-3 mb-3">
+            <div class="col-6">
+                <label class="form-label">First name <span class="text-danger">*</span></label>
+                {{ form.first_name }}
+                {% if form.first_name.errors %}<div class="text-danger small mt-1">{{ form.first_name.errors.0 }}</div>{% endif %}
             </div>
-
-            <div class="mb-3">
-                <label class="form-label fw-semibold">Username <span class="text-danger">*</span></label>
-                {{ form.username }}
-                {% if form.username.errors %}
-                    <div class="text-danger small mt-1">{{ form.username.errors.0 }}</div>
-                {% endif %}
+            <div class="col-6">
+                <label class="form-label">Last name <span class="text-danger">*</span></label>
+                {{ form.last_name }}
+                {% if form.last_name.errors %}<div class="text-danger small mt-1">{{ form.last_name.errors.0 }}</div>{% endif %}
             </div>
+        </div>
 
-            <div class="mb-3">
-                <label class="form-label fw-semibold">Email address <span class="text-danger">*</span></label>
-                {{ form.email }}
-                {% if form.email.errors %}
-                    <div class="text-danger small mt-1">{{ form.email.errors.0 }}</div>
-                {% endif %}
-            </div>
+        <div class="mb-3">
+            <label class="form-label">Username <span class="text-danger">*</span></label>
+            {{ form.username }}
+            {% if form.username.errors %}<div class="text-danger small mt-1">{{ form.username.errors.0 }}</div>{% endif %}
+        </div>
 
-            <div class="mb-3">
-                <label class="form-label fw-semibold">Password <span class="text-danger">*</span></label>
-                {{ form.password }}
-                {% if form.password.errors %}
-                    <div class="text-danger small mt-1">{{ form.password.errors.0 }}</div>
-                {% endif %}
-            </div>
+        <div class="mb-3">
+            <label class="form-label">Email address <span class="text-danger">*</span></label>
+            {{ form.email }}
+            {% if form.email.errors %}<div class="text-danger small mt-1">{{ form.email.errors.0 }}</div>{% endif %}
+        </div>
 
-            <div class="mb-3">
-                <label class="form-label fw-semibold">Confirm password <span class="text-danger">*</span></label>
-                {{ form.confirm_password }}
-                {% if form.confirm_password.errors %}
-                    <div class="text-danger small mt-1">{{ form.confirm_password.errors.0 }}</div>
-                {% endif %}
-            </div>
+        <div class="mb-3">
+            <label class="form-label">Password <span class="text-danger">*</span></label>
+            {{ form.password }}
+            {% if form.password.errors %}<div class="text-danger small mt-1">{{ form.password.errors.0 }}</div>{% endif %}
+        </div>
 
-            <div class="mb-4">
-                <label class="form-label fw-semibold">Requested account type <span class="text-danger">*</span></label>
-                {{ form.requested_role }}
-                {% if form.requested_role.errors %}
-                    <div class="text-danger small mt-1">{{ form.requested_role.errors.0 }}</div>
-                {% endif %}
-                <div class="form-text">
-                    Manager requests require additional approval. All accounts are reviewed before access is granted.
-                </div>
-            </div>
+        <div class="mb-3">
+            <label class="form-label">Confirm password <span class="text-danger">*</span></label>
+            {{ form.confirm_password }}
+            {% if form.confirm_password.errors %}<div class="text-danger small mt-1">{{ form.confirm_password.errors.0 }}</div>{% endif %}
+        </div>
 
-            {% if form.non_field_errors %}
-                <div class="alert alert-danger py-2 small">{{ form.non_field_errors.0 }}</div>
-            {% endif %}
+        <div class="mb-4">
+            <label class="form-label">Requested account type <span class="text-danger">*</span></label>
+            {{ form.requested_role }}
+            {% if form.requested_role.errors %}<div class="text-danger small mt-1">{{ form.requested_role.errors.0 }}</div>{% endif %}
+            <div class="form-text mt-1">Manager requests require additional approval. All accounts are reviewed before access is granted.</div>
+        </div>
 
-            <button type="submit" class="btn btn-primary w-100 mb-3">Submit Registration</button>
-        </form>
+        <button type="submit" class="btn btn-primary w-100">Submit Registration</button>
+    </form>
 
-        <p class="text-center small mb-0">
-            Already have an account? <a href="{% url 'accounts:login' %}">Sign in</a>
-        </p>
+    <hr class="auth-divider">
 
+    <div class="text-center">
+        <span class="text-muted small">Already have an account?</span>
+        <a href="{% url 'accounts:login' %}" class="auth-link small ms-1">Sign in</a>
     </div>
 </div>
-
-<script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/js/bootstrap.bundle.min.js"></script>
-</body>
-</html>
+{% endblock %}

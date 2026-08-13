@@ -1,208 +1,171 @@
-<!DOCTYPE html>
-<html lang="en">
-<head>
-    <meta charset="UTF-8">
-    <title>{{ document.title }} | Archive System</title>
-    <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/css/bootstrap.min.css" rel="stylesheet">
-</head>
-<body class="bg-light">
+{% extends "base.html" %}
+{% block title %}{{ document.title }} | Archive System{% endblock %}
 
-<nav class="navbar navbar-expand-lg navbar-dark bg-dark mb-4">
-    <div class="container">
-        <a class="navbar-brand" href="#">Archive System</a>
-        <div class="ms-auto d-flex align-items-center gap-3">
-            <span class="text-light">{{ request.user.username }}</span>
-            <a href="{% url 'accounts:logout' %}" class="btn btn-outline-light btn-sm">Logout</a>
-        </div>
+{% block content %}
+<!-- Breadcrumb + header -->
+<div class="page-header">
+    <div>
+        <nav aria-label="breadcrumb">
+            <ol class="breadcrumb mb-1">
+                <li class="breadcrumb-item"><a href="{% url 'documents:document_list' %}">Documents</a></li>
+                <li class="breadcrumb-item active">{{ document.document_number }}</li>
+            </ol>
+        </nav>
+        <h1 class="page-header-title">{{ document.title }}</h1>
     </div>
-</nav>
-
-<div class="container" style="max-width: 900px;">
-
-    {% if messages %}
-        {% for message in messages %}
-            <div class="alert alert-{% if 'error' in message.tags %}danger{% else %}success{% endif %} alert-dismissible fade show" role="alert">
-                {{ message }}
-                <button type="button" class="btn-close" data-bs-dismiss="alert"></button>
-            </div>
-        {% endfor %}
-    {% endif %}
-
-    <nav aria-label="breadcrumb" class="mb-3">
-        <ol class="breadcrumb">
-            <li class="breadcrumb-item"><a href="{% url 'documents:document_list' %}">Documents</a></li>
-            <li class="breadcrumb-item active">{{ document.document_number }}</li>
-        </ol>
-    </nav>
-
-    <!-- ── Document metadata ─────────────────────────────────────────── -->
-    <div class="card shadow-sm mb-4">
-        <div class="card-header bg-white d-flex justify-content-between align-items-center">
-            <h5 class="mb-0">{{ document.title }}</h5>
-            <div class="d-flex gap-2">
-                {% if can_edit %}
-                <a href="{% url 'documents:document_edit' document.pk %}" class="btn btn-sm btn-outline-primary">Edit</a>
-                {% endif %}
-                {% if can_delete %}
-                <a href="{% url 'documents:document_delete' document.pk %}" class="btn btn-sm btn-outline-danger">Delete</a>
-                {% endif %}
-            </div>
-        </div>
-        <div class="card-body">
-            <dl class="row mb-0">
-                <dt class="col-sm-3">Document Number</dt>
-                <dd class="col-sm-9"><code>{{ document.document_number }}</code></dd>
-
-                <dt class="col-sm-3">Document Type</dt>
-                <dd class="col-sm-9">{{ document.document_type|default:"—" }}</dd>
-
-                <dt class="col-sm-3">Department</dt>
-                <dd class="col-sm-9">{{ document.department|default:"—" }}</dd>
-
-                <dt class="col-sm-3">Document Date</dt>
-                <dd class="col-sm-9">{{ document.document_date }}</dd>
-
-                <dt class="col-sm-3">Status</dt>
-                <dd class="col-sm-9">
-                    {% if document.status == 'active' %}
-                        <span class="badge bg-success">Active</span>
-                    {% else %}
-                        <span class="badge bg-secondary">Archived</span>
-                    {% endif %}
-                </dd>
-
-                <dt class="col-sm-3">Created By</dt>
-                <dd class="col-sm-9">{{ document.created_by|default:"—" }}</dd>
-
-                <dt class="col-sm-3">Created At</dt>
-                <dd class="col-sm-9">{{ document.created_at|date:"Y-m-d H:i" }}</dd>
-
-                <dt class="col-sm-3">Last Updated</dt>
-                <dd class="col-sm-9">{{ document.updated_at|date:"Y-m-d H:i" }}</dd>
-
-                {% if document.description %}
-                <dt class="col-sm-3">Description</dt>
-                <dd class="col-sm-9">{{ document.description }}</dd>
-                {% endif %}
-            </dl>
-        </div>
+    <div class="d-flex gap-2 flex-wrap align-self-start">
+        {% if can_edit %}
+        <a href="{% url 'documents:document_edit' document.pk %}" class="btn btn-sm btn-outline-primary">
+            <i class="bi bi-pencil me-1"></i>Edit
+        </a>
+        {% endif %}
+        {% if can_delete %}
+        <a href="{% url 'documents:document_delete' document.pk %}" class="btn btn-sm btn-outline-danger">
+            <i class="bi bi-trash me-1"></i>Delete
+        </a>
+        {% endif %}
     </div>
+</div>
 
-    <!-- ── Version History ───────────────────────────────────────────── -->
-    <div class="card shadow-sm mb-4">
-        <div class="card-header bg-white d-flex justify-content-between align-items-center">
-            <div>
-                <h6 class="mb-0 d-inline">Version History</h6>
-                <span class="badge bg-secondary ms-2">{{ versions|length }} version{{ versions|length|pluralize }}</span>
-            </div>
-            {% if can_upload %}
-            <a href="{% url 'documents:document_upload_version' document.pk %}"
-               class="btn btn-sm btn-primary">
-                + Upload New Version
-            </a>
+<!-- Document metadata -->
+<div class="card shadow-sm mb-3">
+    <div class="card-header d-flex justify-content-between align-items-center">
+        <span class="fw-semibold small">Document Information</span>
+        {% if document.status == 'active' %}
+            <span class="badge bg-success">Active</span>
+        {% else %}
+            <span class="badge bg-secondary">Archived</span>
+        {% endif %}
+    </div>
+    <div class="card-body">
+        <dl class="row mb-0 small">
+            <dt class="col-sm-3 text-muted fw-normal">Document Number</dt>
+            <dd class="col-sm-9"><code class="font-monospace" style="color:var(--c-primary);">{{ document.document_number }}</code></dd>
+
+            <dt class="col-sm-3 text-muted fw-normal">Document Type</dt>
+            <dd class="col-sm-9">{{ document.document_type|default:"—" }}</dd>
+
+            <dt class="col-sm-3 text-muted fw-normal">Department</dt>
+            <dd class="col-sm-9">{{ document.department|default:"—" }}</dd>
+
+            <dt class="col-sm-3 text-muted fw-normal">Document Date</dt>
+            <dd class="col-sm-9">{{ document.document_date }}</dd>
+
+            <dt class="col-sm-3 text-muted fw-normal">Created By</dt>
+            <dd class="col-sm-9">{{ document.created_by|default:"—" }}</dd>
+
+            <dt class="col-sm-3 text-muted fw-normal">Created At</dt>
+            <dd class="col-sm-9">{{ document.created_at|date:"Y-m-d H:i" }}</dd>
+
+            <dt class="col-sm-3 text-muted fw-normal">Last Updated</dt>
+            <dd class="col-sm-9">{{ document.updated_at|date:"Y-m-d H:i" }}</dd>
+
+            {% if document.description %}
+            <dt class="col-sm-3 text-muted fw-normal">Description</dt>
+            <dd class="col-sm-9">{{ document.description }}</dd>
             {% endif %}
-        </div>
-
-        <div class="card-body p-0">
-            {% if versions %}
-            <div class="table-responsive">
-            <table class="table table-hover align-middle mb-0">
-                <thead class="table-light">
-                    <tr>
-                        <th style="width:60px;">Ver.</th>
-                        <th>File Name</th>
-                        <th>Type</th>
-                        <th>Size</th>
-                        <th>Uploaded By</th>
-                        <th>Date</th>
-                        <th>Notes</th>
-                        <th>Download</th>
-                    </tr>
-                </thead>
-                <tbody>
-                    {% for v in versions %}
-                    <tr {% if forloop.first %}class="table-primary"{% endif %}>
-                        <td>
-                            <span class="fw-bold">v{{ v.version }}</span>
-                            {% if forloop.first %}
-                                <span class="badge bg-success ms-1">Latest</span>
-                            {% endif %}
-                        </td>
-                        <td class="text-break">{{ v.original_name }}</td>
-                        <td>
-                            {% if v.file_type %}
-                                <span class="badge bg-light text-dark border">{{ v.file_type|upper }}</span>
-                            {% else %}—{% endif %}
-                        </td>
-                        <td class="text-nowrap">
-                            {% if v.file_size %}{{ v.file_size|filesizeformat }}{% else %}—{% endif %}
-                        </td>
-                        <td>{{ v.uploaded_by.get_full_name|default:v.uploaded_by.username|default:"—" }}</td>
-                        <td class="text-nowrap text-muted small">{{ v.uploaded_at|date:"Y-m-d H:i" }}</td>
-                        <td class="text-muted small">
-                            {% if v.notes %}{{ v.notes }}{% else %}<span class="text-muted">—</span>{% endif %}
-                        </td>
-                        <td>
-                            <a href="{{ v.file.url }}"
-                               class="btn btn-sm {% if forloop.first %}btn-primary{% else %}btn-outline-secondary{% endif %}"
-                               target="_blank">Download</a>
-                        </td>
-                    </tr>
-                    {% endfor %}
-                </tbody>
-            </table>
-            </div>
-            {% else %}
-            <div class="text-center py-4 text-muted">
-                No files attached yet.
-                {% if can_upload %}
-                    <a href="{% url 'documents:document_upload_version' document.pk %}">Upload the first version</a>
-                {% endif %}
-            </div>
-            {% endif %}
-        </div>
+        </dl>
     </div>
+</div>
 
-    <!-- ── Movement History ──────────────────────────────────────────── -->
-    <div class="card shadow-sm mb-4">
-        <div class="card-header bg-white d-flex justify-content-between align-items-center">
-            <h6 class="mb-0">Movement History</h6>
-            <span class="badge bg-secondary">{{ logs|length }} event{{ logs|length|pluralize }}</span>
+<!-- Version History -->
+<div class="card shadow-sm mb-3">
+    <div class="card-header d-flex justify-content-between align-items-center">
+        <div>
+            <span class="fw-semibold small">Version History</span>
+            <span class="badge bg-secondary ms-2">{{ versions|length }} version{{ versions|length|pluralize }}</span>
         </div>
-        <div class="card-body p-0">
-            {% if logs %}
-            <div class="list-group list-group-flush">
-                {% for entry in logs %}
-                <div class="list-group-item px-3 py-3">
-                    <div class="d-flex justify-content-between align-items-start gap-2">
-                        <div class="flex-grow-1">
-                            <span class="badge {{ entry.badge_class }} me-2">
-                                {{ entry.get_action_display }}
-                            </span>
+        {% if can_upload %}
+        <a href="{% url 'documents:document_upload_version' document.pk %}" class="btn btn-sm btn-primary">
+            <i class="bi bi-upload me-1"></i>Upload New Version
+        </a>
+        {% endif %}
+    </div>
+    <div class="card-body p-0">
+        {% if versions %}
+        <div class="table-responsive">
+        <table class="table table-hover align-middle mb-0 small">
+            <thead class="table-light">
+                <tr>
+                    <th style="width:80px;">Version</th>
+                    <th>File Name</th>
+                    <th>Type</th>
+                    <th>Size</th>
+                    <th>Uploaded By</th>
+                    <th>Date</th>
+                    <th>Notes</th>
+                    <th>Download</th>
+                </tr>
+            </thead>
+            <tbody>
+                {% for v in versions %}
+                <tr {% if forloop.first %}style="background:rgba(111,133,117,0.06);"{% endif %}>
+                    <td>
+                        <span class="fw-semibold">v{{ v.version }}</span>
+                        {% if forloop.first %}<span class="badge bg-success ms-1">Latest</span>{% endif %}
+                    </td>
+                    <td class="text-break">{{ v.original_name }}</td>
+                    <td>
+                        {% if v.file_type %}<span class="badge bg-light text-dark border">{{ v.file_type|upper }}</span>
+                        {% else %}—{% endif %}
+                    </td>
+                    <td class="text-nowrap">{% if v.file_size %}{{ v.file_size|filesizeformat }}{% else %}—{% endif %}</td>
+                    <td>{{ v.uploaded_by.get_full_name|default:v.uploaded_by.username|default:"—" }}</td>
+                    <td class="text-nowrap text-muted">{{ v.uploaded_at|date:"Y-m-d H:i" }}</td>
+                    <td class="text-muted" style="max-width:180px;">{{ v.notes|default:"—" }}</td>
+                    <td>
+                        <a href="{{ v.file.url }}"
+                           class="btn btn-sm {% if forloop.first %}btn-primary{% else %}btn-outline-secondary{% endif %}"
+                           target="_blank">
+                            <i class="bi bi-download me-1"></i>Download
+                        </a>
+                    </td>
+                </tr>
+                {% endfor %}
+            </tbody>
+        </table>
+        </div>
+        {% else %}
+        <div class="text-center py-4 text-muted small">
+            No files attached yet.
+            {% if can_upload %}<a href="{% url 'documents:document_upload_version' document.pk %}">Upload the first version</a>{% endif %}
+        </div>
+        {% endif %}
+    </div>
+</div>
+
+<!-- Movement History -->
+<div class="card shadow-sm mb-3">
+    <div class="card-header d-flex justify-content-between align-items-center">
+        <span class="fw-semibold small">Movement History</span>
+        <span class="badge bg-secondary">{{ logs|length }} event{{ logs|length|pluralize }}</span>
+    </div>
+    <div class="card-body p-0">
+        {% if logs %}
+        <div class="timeline">
+            {% for entry in logs %}
+            <div class="timeline-item">
+                <div class="timeline-dot"></div>
+                <div class="timeline-content">
+                    <div class="d-flex justify-content-between align-items-start gap-2 flex-wrap">
+                        <div>
+                            <span class="badge {{ entry.badge_class }} me-1">{{ entry.get_action_display }}</span>
                             <span class="fw-semibold small">
                                 {{ entry.user.get_full_name|default:entry.user.username|default:"Unknown user" }}
                             </span>
                             {% if entry.details %}
-                            <div class="mt-1 text-muted small" style="white-space: pre-line;">{{ entry.details }}</div>
+                            <div class="mt-1 text-muted small" style="white-space:pre-line;">{{ entry.details }}</div>
                             {% endif %}
                         </div>
-                        <div class="text-muted small text-nowrap">
-                            {{ entry.timestamp|date:"Y-m-d H:i" }}
-                        </div>
+                        <span class="timeline-meta text-nowrap">{{ entry.timestamp|date:"Y-m-d H:i" }}</span>
                     </div>
                 </div>
-                {% endfor %}
             </div>
-            {% else %}
-            <div class="text-center py-4 text-muted small">
-                No activity recorded yet.
-            </div>
-            {% endif %}
+            {% endfor %}
         </div>
+        {% else %}
+        <div class="text-center py-4 text-muted small">No activity recorded yet.</div>
+        {% endif %}
     </div>
-
 </div>
-
-<script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/js/bootstrap.bundle.min.js"></script>
-</body>
-</html>
+{% endblock %}

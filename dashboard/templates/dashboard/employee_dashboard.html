@@ -1,12 +1,33 @@
-<!DOCTYPE html>
-<html lang="en">
-<head>
-    <meta charset="UTF-8">
-    <title>Employee Dashboard</title>
-</head>
-<body>
-    <h1>Employee Dashboard</h1>
-    <p>Welcome {{ request.user.username }}</p>
-    <a href="{% url 'accounts:logout' %}">Logout</a>
-</body>
-</html>
+{% extends "base.html" %}
+{% block title %}Dashboard | Archive System{% endblock %}
+
+{% block content %}
+<div class="page-header">
+    <div>
+        <h1 class="page-header-title">Dashboard</h1>
+        <div class="page-header-sub">Welcome, {{ request.user.get_full_name|default:request.user.username }}</div>
+    </div>
+</div>
+
+<div class="row g-3">
+
+    <div class="col-sm-6 col-md-4">
+        <div class="action-card">
+            <div class="action-card-icon"><i class="bi bi-folder2-open"></i></div>
+            <h6>Documents</h6>
+            <p>Browse and search all documents available to you in the archive.</p>
+            <a href="{% url 'documents:document_list' %}" class="btn btn-sm btn-outline-primary">Browse Documents</a>
+        </div>
+    </div>
+
+    <div class="col-sm-6 col-md-4">
+        <div class="action-card">
+            <div class="action-card-icon"><i class="bi bi-search"></i></div>
+            <h6>Advanced Search</h6>
+            <p>Filter documents by number, type, department, date range and more.</p>
+            <a href="{% url 'documents:document_list' %}" class="btn btn-sm btn-outline-primary">Search</a>
+        </div>
+    </div>
+
+</div>
+{% endblock %}

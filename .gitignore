@@ -45,3 +45,10 @@ Thumbs.db
 *.log
 *.zip
 attached_assets/
+
+# Replit-specific files
+.agents/
+attached_assets/
+replit.md
+.replit
+replit.nix

@@ -1,1 +1,0 @@
-- [Django Archive System Setup](django-archive-setup.md) — Python 3.11 vs 3.12, CRLF files, approval workflow, LOGIN_URL, adminNour password reset during testing

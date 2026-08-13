@@ -22,8 +22,29 @@ class DocumentForm(forms.ModelForm):
 
 
 class DocumentFileForm(forms.Form):
+    """Lightweight form used only during document creation for the optional first file."""
     file = forms.FileField(
         required=False,
         widget=forms.ClearableFileInput(attrs={'class': 'form-control'}),
         label='Attach file (optional)',
+    )
+
+
+class VersionUploadForm(forms.Form):
+    """Dedicated form for uploading a new document version."""
+    file = forms.FileField(
+        required=True,
+        widget=forms.ClearableFileInput(attrs={'class': 'form-control'}),
+        label='Select file',
+        error_messages={'required': 'Please select a file to upload.'},
+    )
+    notes = forms.CharField(
+        required=False,
+        widget=forms.Textarea(attrs={
+            'class': 'form-control',
+            'rows': 3,
+            'placeholder': 'Optional: describe what changed in this version…',
+        }),
+        label='Version notes (optional)',
+        max_length=1000,
     )

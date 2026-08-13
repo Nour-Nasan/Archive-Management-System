@@ -64,10 +64,11 @@ class DocumentFile(models.Model):
         related_name='uploaded_files'
     )
 
+    notes = models.TextField(blank=True, default='')
     uploaded_at = models.DateTimeField(auto_now_add=True)
 
     class Meta:
-        ordering = ['-uploaded_at']
+        ordering = ['-version']  # newest version first
 
     def __str__(self):
         return f"{self.original_name} - v{self.version}"

@@ -34,10 +34,9 @@
             <h5 class="mb-0">{{ action }} Document</h5>
         </div>
         <div class="card-body">
-            <form method="post" enctype="multipart/form-data" novalidate>
+            <form method="post" {% if action == 'Add' %}enctype="multipart/form-data"{% endif %} novalidate>
                 {% csrf_token %}
 
-                <!-- Document fields -->
                 <div class="row g-3 mb-3">
                     <div class="col-md-8">
                         <label class="form-label fw-semibold">Title <span class="text-danger">*</span></label>
@@ -76,16 +75,26 @@
                     </div>
                 </div>
 
-                <!-- File upload -->
+                {% if action == 'Add' %}
+                <!-- Initial file attachment — only shown when creating a new document -->
                 <hr>
                 <div class="mb-3">
                     <label class="form-label fw-semibold">
                         {{ file_form.file.label }}
-                        {% if action == 'Edit' %}<span class="text-muted fw-normal">(uploading will add a new version)</span>{% endif %}
+                        <span class="text-muted fw-normal small">(will be saved as v1)</span>
                     </label>
                     {{ file_form.file }}
                     {% if file_form.file.errors %}<div class="text-danger small mt-1">{{ file_form.file.errors }}</div>{% endif %}
                 </div>
+                {% else %}
+                <!-- Edit mode: file upload moved to dedicated Upload Version page -->
+                <hr>
+                <div class="alert alert-light border d-flex align-items-center gap-3 mb-3 py-2">
+                    <span class="text-muted small">To upload a new file version, use the dedicated page.</span>
+                    <a href="{% url 'documents:document_upload_version' document.pk %}"
+                       class="btn btn-sm btn-outline-primary ms-auto text-nowrap">Upload New Version</a>
+                </div>
+                {% endif %}
 
                 <div class="d-flex gap-2">
                     <button type="submit" class="btn btn-primary">Save Document</button>

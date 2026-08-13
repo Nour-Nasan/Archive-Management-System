@@ -4,10 +4,25 @@ from django.contrib import messages
 from django.db.models import Q
 from django.shortcuts import render, get_object_or_404, redirect
 
-from .forms import DocumentForm, DocumentFileForm
+from .forms import DocumentForm, DocumentFileForm, VersionUploadForm
 from .models import Document, DocumentFile, Department, DocumentType, DocumentLog
 from .utils import log_action, diff_document
 
+
+# ─── Helpers ──────────────────────────────────────────────────────────────────
+
+def _can_upload(user):
+    """Managers and System Administrators may upload new versions."""
+    return user.is_superuser or user.is_manager()
+
+
+def _next_version(doc):
+    """Return the next safe version number for a document (max existing + 1)."""
+    max_v = doc.files.order_by('-version').values_list('version', flat=True).first()
+    return (max_v or 0) + 1
+
+
+# ─── Document CRUD ────────────────────────────────────────────────────────────
 
 @login_required
 def document_list(request):
@@ -58,8 +73,7 @@ def document_create(request):
 
             uploaded = request.FILES.get('file')
             if uploaded:
-                next_version = (doc.files.order_by('-version')
-                                .values_list('version', flat=True).first() or 0) + 1
+                version = _next_version(doc)
                 DocumentFile.objects.create(
                     document=doc,
                     file=uploaded,
@@ -67,12 +81,12 @@ def document_create(request):
                     file_type=os.path.splitext(uploaded.name)[1].lstrip('.').lower(),
                     file_size=uploaded.size,
                     uploaded_by=request.user,
-                    version=next_version,
+                    version=version,
+                    notes='Initial version uploaded with document.',
                 )
-                # ── Audit: file uploaded with initial create ─────────────
                 log_action(doc, request.user, DocumentLog.ACTION_FILE_UPLOADED,
-                           f'File: {uploaded.name} (v{next_version}, '
-                           f'{uploaded.size} bytes)')
+                           f'File: {uploaded.name} (v{version}, {uploaded.size:,} bytes)\n'
+                           f'Notes: Initial version uploaded with document.')
 
             messages.success(request, 'Document created successfully.')
             return redirect('documents:document_detail', pk=doc.pk)
@@ -93,20 +107,16 @@ def document_detail(request, pk):
         Document.objects.select_related('document_type', 'department', 'created_by'),
         pk=pk,
     )
-    files = doc.files.select_related('uploaded_by').all()
+    # Versions ordered newest first (by version DESC — set in model Meta)
+    versions = doc.files.select_related('uploaded_by').order_by('-version')
 
-    # Movement history — managers and superusers see it; employees also see it
-    # because they already have access to this document (login_required is the gate)
-    logs = (
-        doc.logs
-        .select_related('user')
-        .order_by('-timestamp')
-    )
+    logs = doc.logs.select_related('user').order_by('-timestamp')
 
     return render(request, 'documents/document_detail.html', {
         'document': doc,
-        'files': files,
+        'versions': versions,
         'logs': logs,
+        'can_upload': _can_upload(request.user),
     })
 
 
@@ -129,8 +139,7 @@ def document_edit(request, pk):
         old_status = doc.status
 
         form = DocumentForm(request.POST, instance=doc)
-        file_form = DocumentFileForm(request.POST, request.FILES)
-        if form.is_valid() and file_form.is_valid():
+        if form.is_valid():
             form.save()
             doc.refresh_from_db()
 
@@ -148,46 +157,23 @@ def document_edit(request, pk):
             }
             changes, status_changed = diff_document(old, new_data, doc)
 
-            # ── Audit: edited ────────────────────────────────────────────
             if changes:
                 log_action(doc, request.user, DocumentLog.ACTION_EDITED,
                            '\n'.join(changes))
 
-            # ── Audit: status changed (separate entry for clarity) ────────
             if status_changed:
                 old_label = dict(Document.STATUS_CHOICES).get(old_status, old_status)
                 new_label = doc.get_status_display()
                 log_action(doc, request.user, DocumentLog.ACTION_STATUS_CHANGED,
                            f'Status changed from "{old_label}" to "{new_label}"')
 
-            # ── File upload ──────────────────────────────────────────────
-            uploaded = request.FILES.get('file')
-            if uploaded:
-                next_version = (doc.files.order_by('-version')
-                                .values_list('version', flat=True).first() or 0) + 1
-                DocumentFile.objects.create(
-                    document=doc,
-                    file=uploaded,
-                    original_name=uploaded.name,
-                    file_type=os.path.splitext(uploaded.name)[1].lstrip('.').lower(),
-                    file_size=uploaded.size,
-                    uploaded_by=request.user,
-                    version=next_version,
-                )
-                # ── Audit: new file version ──────────────────────────────
-                log_action(doc, request.user, DocumentLog.ACTION_FILE_UPLOADED,
-                           f'File: {uploaded.name} (v{next_version}, '
-                           f'{uploaded.size} bytes)')
-
             messages.success(request, 'Document updated successfully.')
             return redirect('documents:document_detail', pk=doc.pk)
     else:
         form = DocumentForm(instance=doc)
-        file_form = DocumentFileForm()
 
     return render(request, 'documents/document_form.html', {
         'form': form,
-        'file_form': file_form,
         'action': 'Edit',
         'document': doc,
     })
@@ -197,10 +183,67 @@ def document_edit(request, pk):
 def document_delete(request, pk):
     doc = get_object_or_404(Document, pk=pk)
     if request.method == 'POST':
-        # ── Audit: log BEFORE deletion so we capture the event ───────────
         log_action(doc, request.user, DocumentLog.ACTION_DELETED,
-                   f'Document "{doc.title}" ({doc.document_number}) permanently deleted.')
+                   f'Document "{doc.title}" ({doc.document_number}) permanently deleted '
+                   f'({doc.files.count()} file version(s) removed).')
         doc.delete()
         messages.success(request, 'Document deleted.')
         return redirect('documents:document_list')
     return render(request, 'documents/document_confirm_delete.html', {'document': doc})
+
+
+# ─── Version Upload ────────────────────────────────────────────────────────────
+
+@login_required
+def document_upload_version(request, pk):
+    doc = get_object_or_404(
+        Document.objects.select_related('document_type', 'department'),
+        pk=pk,
+    )
+
+    # Server-side permission: managers and superusers only
+    if not _can_upload(request.user):
+        messages.error(request, 'You do not have permission to upload file versions.')
+        return redirect('documents:document_detail', pk=doc.pk)
+
+    if request.method == 'POST':
+        form = VersionUploadForm(request.POST, request.FILES)
+        if form.is_valid():
+            uploaded = form.cleaned_data['file']
+            notes = form.cleaned_data.get('notes', '').strip()
+            version = _next_version(doc)
+
+            DocumentFile.objects.create(
+                document=doc,
+                file=uploaded,
+                original_name=uploaded.name,
+                file_type=os.path.splitext(uploaded.name)[1].lstrip('.').lower(),
+                file_size=uploaded.size,
+                uploaded_by=request.user,
+                version=version,
+                notes=notes,
+            )
+
+            # ── Audit log ─────────────────────────────────────────────────
+            log_detail_parts = [
+                f'File: {uploaded.name}',
+                f'Version: v{version}',
+                f'Size: {uploaded.size:,} bytes',
+            ]
+            if notes:
+                log_detail_parts.append(f'Notes: {notes}')
+            log_action(doc, request.user, DocumentLog.ACTION_FILE_UPLOADED,
+                       '\n'.join(log_detail_parts))
+
+            messages.success(request,
+                             f'Version v{version} uploaded successfully: {uploaded.name}')
+            return redirect('documents:document_detail', pk=doc.pk)
+    else:
+        form = VersionUploadForm()
+
+    next_ver = _next_version(doc)
+    return render(request, 'documents/document_upload_version.html', {
+        'document': doc,
+        'form': form,
+        'next_version': next_ver,
+    })

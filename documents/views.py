@@ -4,6 +4,7 @@ from django.contrib import messages
 from django.db.models import Q
 from django.shortcuts import render, get_object_or_404, redirect
 
+from accounts.decorators import manager_required, superuser_required
 from .forms import DocumentForm, DocumentFileForm, VersionUploadForm
 from .models import Document, DocumentFile, Department, DocumentType, DocumentLog
 from .utils import log_action, diff_document
@@ -12,12 +13,23 @@ from django.contrib.auth import get_user_model
 User = get_user_model()
 
 
-# ─── Helpers ──────────────────────────────────────────────────────────────────
+# ─── Permission helpers ────────────────────────────────────────────────────────
 
-def _can_upload(user):
-    """Managers and System Administrators may upload new versions."""
+def _can_create(user):
+    """Managers and System Administrators may create documents."""
     return user.is_superuser or user.is_manager()
 
+def _can_edit(user):
+    """Managers and System Administrators may edit documents."""
+    return user.is_superuser or user.is_manager()
+
+def _can_delete(user):
+    """Only the System Administrator may delete documents."""
+    return user.is_superuser
+
+def _can_upload(user):
+    """Managers and System Administrators may upload new file versions."""
+    return user.is_superuser or user.is_manager()
 
 def _next_version(doc):
     """Return the next safe version number for a document (max existing + 1)."""
@@ -25,7 +37,7 @@ def _next_version(doc):
     return (max_v or 0) + 1
 
 
-# ─── Document CRUD ────────────────────────────────────────────────────────────
+# ─── Document list / search ────────────────────────────────────────────────────
 
 @login_required
 def document_list(request):
@@ -41,9 +53,7 @@ def document_list(request):
     f_date_from   = request.GET.get('date_from',      '').strip()
     f_date_to     = request.GET.get('date_to',        '').strip()
     f_created_by  = request.GET.get('created_by',     '').strip()
-
-    # Legacy single-box search kept for any existing bookmarks
-    f_q           = request.GET.get('q',              '').strip()
+    f_q           = request.GET.get('q',              '').strip()  # legacy
 
     # ── Apply filters (AND logic; each ignored when empty) ───────────────
     if f_q:
@@ -77,7 +87,6 @@ def document_list(request):
     if f_created_by:
         qs = qs.filter(created_by_id=f_created_by)
 
-    # Guarantee no accidental duplicates (safe even without distinct())
     qs = qs.distinct()
 
     is_filtered = any([
@@ -106,11 +115,40 @@ def document_list(request):
         'f_date_from':   f_date_from,
         'f_date_to':     f_date_to,
         'f_created_by':  f_created_by,
+        # Permission flags for template
+        'can_create': _can_create(request.user),
+        'can_edit':   _can_edit(request.user),
+        'can_delete': _can_delete(request.user),
     }
     return render(request, 'documents/document_list.html', context)
 
 
+# ─── Document detail ───────────────────────────────────────────────────────────
+
 @login_required
+def document_detail(request, pk):
+    doc = get_object_or_404(
+        Document.objects.select_related('document_type', 'department', 'created_by'),
+        pk=pk,
+    )
+    versions = doc.files.select_related('uploaded_by').order_by('-version')
+    logs = doc.logs.select_related('user').order_by('-timestamp')
+
+    return render(request, 'documents/document_detail.html', {
+        'document': doc,
+        'versions': versions,
+        'logs':     logs,
+        # Permission flags
+        'can_edit':   _can_edit(request.user),
+        'can_delete': _can_delete(request.user),
+        'can_upload': _can_upload(request.user),
+    })
+
+
+# ─── Document create ───────────────────────────────────────────────────────────
+
+@login_required
+@manager_required
 def document_create(request):
     if request.method == 'POST':
         form = DocumentForm(request.POST)
@@ -120,7 +158,6 @@ def document_create(request):
             doc.created_by = request.user
             doc.save()
 
-            # ── Audit: document created ──────────────────────────────────
             details_parts = [
                 f'Title: {doc.title}',
                 f'Document Number: {doc.document_number}',
@@ -158,33 +195,17 @@ def document_create(request):
         'form': form,
         'file_form': file_form,
         'action': 'Add',
-    })
-
-
-@login_required
-def document_detail(request, pk):
-    doc = get_object_or_404(
-        Document.objects.select_related('document_type', 'department', 'created_by'),
-        pk=pk,
-    )
-    # Versions ordered newest first (by version DESC — set in model Meta)
-    versions = doc.files.select_related('uploaded_by').order_by('-version')
-
-    logs = doc.logs.select_related('user').order_by('-timestamp')
-
-    return render(request, 'documents/document_detail.html', {
-        'document': doc,
-        'versions': versions,
-        'logs': logs,
         'can_upload': _can_upload(request.user),
     })
 
 
+# ─── Document edit ─────────────────────────────────────────────────────────────
+
 @login_required
+@manager_required
 def document_edit(request, pk):
     doc = get_object_or_404(Document, pk=pk)
     if request.method == 'POST':
-        # ── Snapshot BEFORE save ─────────────────────────────────────────
         old = {
             'title': doc.title,
             'document_number': doc.document_number,
@@ -203,7 +224,6 @@ def document_edit(request, pk):
             form.save()
             doc.refresh_from_db()
 
-            # ── Compute field-level diff ─────────────────────────────────
             new_data = {
                 'title': doc.title,
                 'document_number': doc.document_number,
@@ -236,10 +256,14 @@ def document_edit(request, pk):
         'form': form,
         'action': 'Edit',
         'document': doc,
+        'can_upload': _can_upload(request.user),
     })
 
 
+# ─── Document delete ───────────────────────────────────────────────────────────
+
 @login_required
+@superuser_required
 def document_delete(request, pk):
     doc = get_object_or_404(Document, pk=pk)
     if request.method == 'POST':
@@ -252,7 +276,7 @@ def document_delete(request, pk):
     return render(request, 'documents/document_confirm_delete.html', {'document': doc})
 
 
-# ─── Version Upload ────────────────────────────────────────────────────────────
+# ─── Version upload ────────────────────────────────────────────────────────────
 
 @login_required
 def document_upload_version(request, pk):
@@ -261,7 +285,6 @@ def document_upload_version(request, pk):
         pk=pk,
     )
 
-    # Server-side permission: managers and superusers only
     if not _can_upload(request.user):
         messages.error(request, 'You do not have permission to upload file versions.')
         return redirect('documents:document_detail', pk=doc.pk)
@@ -284,7 +307,6 @@ def document_upload_version(request, pk):
                 notes=notes,
             )
 
-            # ── Audit log ─────────────────────────────────────────────────
             log_detail_parts = [
                 f'File: {uploaded.name}',
                 f'Version: v{version}',

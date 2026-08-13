@@ -38,6 +38,19 @@
             </div>
         </div>
 
+        <div class="col-md-4">
+            <div class="card shadow-sm h-100">
+                <div class="card-body">
+                    <h6 class="card-title text-muted text-uppercase small fw-bold mb-3">Reports</h6>
+                    <div class="d-grid gap-2">
+                        <a href="{% url 'dashboard:reports' %}" class="btn btn-outline-success">
+                            📊 Reports &amp; Statistics
+                        </a>
+                    </div>
+                </div>
+            </div>
+        </div>
+
         {% if request.user.is_superuser %}
         <div class="col-md-4">
             <div class="card shadow-sm h-100 border-dark">

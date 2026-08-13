@@ -1,0 +1,128 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <title>Documents | Archive System</title>
+    <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/css/bootstrap.min.css" rel="stylesheet">
+</head>
+<body class="bg-light">
+
+<nav class="navbar navbar-expand-lg navbar-dark bg-dark mb-4">
+    <div class="container">
+        <a class="navbar-brand" href="#">Archive System</a>
+        <div class="ms-auto d-flex align-items-center gap-3">
+            <span class="text-light">{{ request.user.username }}</span>
+            <a href="{% url 'accounts:logout' %}" class="btn btn-outline-light btn-sm">Logout</a>
+        </div>
+    </div>
+</nav>
+
+<div class="container">
+
+    {% if messages %}
+        {% for message in messages %}
+            <div class="alert alert-{{ message.tags }} alert-dismissible fade show" role="alert">
+                {{ message }}
+                <button type="button" class="btn-close" data-bs-dismiss="alert"></button>
+            </div>
+        {% endfor %}
+    {% endif %}
+
+    <div class="d-flex justify-content-between align-items-center mb-3">
+        <h4 class="mb-0">Documents</h4>
+        <a href="{% url 'documents:document_create' %}" class="btn btn-primary btn-sm">+ Add Document</a>
+    </div>
+
+    <!-- Search & Filter -->
+    <form method="get" class="card card-body mb-4 shadow-sm">
+        <div class="row g-2 align-items-end">
+            <div class="col-md-4">
+                <label class="form-label fw-semibold mb-1">Search</label>
+                <input type="text" name="q" value="{{ q }}" class="form-control" placeholder="Title or document number">
+            </div>
+            <div class="col-md-3">
+                <label class="form-label fw-semibold mb-1">Department</label>
+                <select name="department" class="form-select">
+                    <option value="">All Departments</option>
+                    {% for dept in departments %}
+                        <option value="{{ dept.pk }}" {% if selected_dept == dept.pk|stringformat:"s" %}selected{% endif %}>{{ dept.name }}</option>
+                    {% endfor %}
+                </select>
+            </div>
+            <div class="col-md-3">
+                <label class="form-label fw-semibold mb-1">Document Type</label>
+                <select name="document_type" class="form-select">
+                    <option value="">All Types</option>
+                    {% for dtype in document_types %}
+                        <option value="{{ dtype.pk }}" {% if selected_dtype == dtype.pk|stringformat:"s" %}selected{% endif %}>{{ dtype.name }}</option>
+                    {% endfor %}
+                </select>
+            </div>
+            <div class="col-md-2 d-flex gap-2">
+                <button type="submit" class="btn btn-primary w-100">Filter</button>
+                <a href="{% url 'documents:document_list' %}" class="btn btn-outline-secondary w-100">Clear</a>
+            </div>
+        </div>
+    </form>
+
+    <!-- Document Table -->
+    <div class="card shadow-sm">
+        <div class="card-body p-0">
+            {% if documents %}
+            <table class="table table-hover mb-0">
+                <thead class="table-light">
+                    <tr>
+                        <th>Doc #</th>
+                        <th>Title</th>
+                        <th>Type</th>
+                        <th>Department</th>
+                        <th>Date</th>
+                        <th>Status</th>
+                        <th>Actions</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    {% for doc in documents %}
+                    <tr>
+                        <td><code>{{ doc.document_number }}</code></td>
+                        <td>
+                            <a href="{% url 'documents:document_detail' doc.pk %}" class="text-decoration-none fw-semibold">
+                                {{ doc.title }}
+                            </a>
+                        </td>
+                        <td>{{ doc.document_type|default:"—" }}</td>
+                        <td>{{ doc.department|default:"—" }}</td>
+                        <td>{{ doc.document_date }}</td>
+                        <td>
+                            {% if doc.status == 'active' %}
+                                <span class="badge bg-success">Active</span>
+                            {% else %}
+                                <span class="badge bg-secondary">Archived</span>
+                            {% endif %}
+                        </td>
+                        <td>
+                            <a href="{% url 'documents:document_edit' doc.pk %}" class="btn btn-sm btn-outline-primary">Edit</a>
+                            <a href="{% url 'documents:document_delete' doc.pk %}" class="btn btn-sm btn-outline-danger">Delete</a>
+                        </td>
+                    </tr>
+                    {% endfor %}
+                </tbody>
+            </table>
+            {% else %}
+            <div class="text-center py-5 text-muted">
+                <p class="mb-1">No documents found.</p>
+                {% if q or selected_dept or selected_dtype %}
+                    <a href="{% url 'documents:document_list' %}">Clear filters</a>
+                {% else %}
+                    <a href="{% url 'documents:document_create' %}">Add your first document</a>
+                {% endif %}
+            </div>
+            {% endif %}
+        </div>
+    </div>
+
+</div>
+
+<script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/js/bootstrap.bundle.min.js"></script>
+</body>
+</html>

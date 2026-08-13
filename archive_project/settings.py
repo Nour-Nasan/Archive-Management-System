@@ -8,11 +8,21 @@ BASE_DIR = Path(__file__).resolve().parent.parent
 
 
 
-SECRET_KEY = os.getenv('SECRET_KEY', os.getenv('SESSION_SECRET', 'django-insecure-fallback-dev-key'))
+# SECRET_KEY must be set via environment variable — never hard-coded.
+SECRET_KEY = os.getenv('SECRET_KEY') or os.getenv('SESSION_SECRET')
+if not SECRET_KEY:
+    raise ValueError(
+        "No SECRET_KEY found. Set SECRET_KEY in your .env file or environment variables. "
+        "Generate one with: python -c \"from django.core.management.utils import "
+        "get_random_secret_key; print(get_random_secret_key())\""
+    )
 
-DEBUG = True
+# Read DEBUG from environment; defaults to False for safety.
+DEBUG = os.getenv('DEBUG', 'False').lower() in ('true', '1', 'yes')
 
-ALLOWED_HOSTS = ['*']
+# ALLOWED_HOSTS: comma-separated list in env, or '*' for local dev convenience.
+_allowed_hosts_env = os.getenv('ALLOWED_HOSTS', '*')
+ALLOWED_HOSTS = [h.strip() for h in _allowed_hosts_env.split(',') if h.strip()]
 
 CSRF_TRUSTED_ORIGINS = [
     'https://*.replit.dev',

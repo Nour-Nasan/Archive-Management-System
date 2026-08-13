@@ -1,13 +1,5 @@
-asgiref==3.11.1
+# Direct dependencies — install with: pip install -r requirements.txt
 Django==5.2.15
-pillow==12.3.0
+gunicorn==26.0.0
+Pillow==12.3.0
 python-dotenv==1.2.2
-sqlparse==0.5.5
-tzdata==2026.2
-gunicorn
-Django==5.2.15
-gunicorn
-pillow==12.3.0
-python-dotenv==1.2.2
-sqlparse==0.5.5
-tzdata==2026.2

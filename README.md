@@ -4,6 +4,10 @@ A web-based Archive Management System developed using Django to help organizatio
 
 The system provides role-based access control, document version management, advanced search, activity tracking, reports, user administration, and a complete audit trail.
 
+## Live Demo
+
+https://archive-management-system.onrender.com/
+
 ## Features
 
 ### Authentication & User Management
@@ -143,6 +147,9 @@ Has read-only access to:
 - Django ORM
 - Git
 - GitHub
+- PostgreSQL (Neon)
+- Cloudinary
+- Render
 
 ## Project Structure
 
@@ -245,7 +252,7 @@ The system uses a professional responsive dashboard layout with role-based navig
 
 ## Project Status
 
-Core system functionality is complete.
+The system is complete, deployed, and available as a live demo.
 
 Implemented modules include:
 

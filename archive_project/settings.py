@@ -146,9 +146,13 @@ STATIC_ROOT = BASE_DIR / 'staticfiles'
 
 STORAGES = {
     # Media uploads: Cloudinary in production (DEBUG=False), local FS in dev.
+    # RawMediaCloudinaryStorage (resource_type='raw') is required for arbitrary
+    # document files (.pdf, .docx, .xlsx, .zip, etc.).  The default
+    # MediaCloudinaryStorage uses resource_type='image' and rejects non-image
+    # uploads with a 500 error.
     'default': {
         'BACKEND': (
-            'cloudinary_storage.storage.MediaCloudinaryStorage'
+            'cloudinary_storage.storage.RawMediaCloudinaryStorage'
             if not DEBUG
             else 'django.core.files.storage.FileSystemStorage'
         ),

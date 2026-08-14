@@ -47,6 +47,10 @@ INSTALLED_APPS = [
     'django.contrib.sessions',
     'django.contrib.messages',
     'django.contrib.staticfiles',
+    # Cloudinary — must come before 'django.contrib.staticfiles' is processed
+    # in production; listed here so it is always available for import.
+    'cloudinary_storage',
+    'cloudinary',
     'accounts',
     'core',
     'dashboard',
@@ -141,9 +145,13 @@ STATICFILES_DIRS = [
 STATIC_ROOT = BASE_DIR / 'staticfiles'
 
 STORAGES = {
-    # Default file storage for media uploads (unchanged from Django default).
+    # Media uploads: Cloudinary in production (DEBUG=False), local FS in dev.
     'default': {
-        'BACKEND': 'django.core.files.storage.FileSystemStorage',
+        'BACKEND': (
+            'cloudinary_storage.storage.MediaCloudinaryStorage'
+            if not DEBUG
+            else 'django.core.files.storage.FileSystemStorage'
+        ),
     },
     # WhiteNoise compresses and fingerprints static files for production.
     'staticfiles': {
@@ -153,9 +161,22 @@ STORAGES = {
 
 
 # ── Media files ───────────────────────────────────────────────────────────
+# Local dev only — Cloudinary ignores MEDIA_ROOT/MEDIA_URL in production.
 
 MEDIA_URL = '/media/'
 MEDIA_ROOT = BASE_DIR / 'media'
+
+
+# ── Cloudinary ────────────────────────────────────────────────────────────
+# Credentials read from environment variables only — never hard-coded.
+# Required on Render (production): CLOUDINARY_CLOUD_NAME, CLOUDINARY_API_KEY,
+# CLOUDINARY_API_SECRET.
+
+CLOUDINARY_STORAGE = {
+    'CLOUD_NAME': os.getenv('CLOUDINARY_CLOUD_NAME', ''),
+    'API_KEY':    os.getenv('CLOUDINARY_API_KEY', ''),
+    'API_SECRET': os.getenv('CLOUDINARY_API_SECRET', ''),
+}
 
 
 # ── Misc ──────────────────────────────────────────────────────────────────

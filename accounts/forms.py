@@ -3,6 +3,26 @@ from django.contrib.auth.password_validation import validate_password
 from .models import User, Role
 
 
+class ProfileEditForm(forms.ModelForm):
+    """Lets any authenticated user update their own first name, last name, and email."""
+
+    class Meta:
+        model = User
+        fields = ['first_name', 'last_name', 'email']
+        widgets = {
+            'first_name': forms.TextInput(attrs={'class': 'form-control'}),
+            'last_name':  forms.TextInput(attrs={'class': 'form-control'}),
+            'email':      forms.EmailInput(attrs={'class': 'form-control'}),
+        }
+
+    def clean_email(self):
+        email = self.cleaned_data['email']
+        qs = User.objects.filter(email=email).exclude(pk=self.instance.pk)
+        if qs.exists():
+            raise forms.ValidationError('An account with this email already exists.')
+        return email
+
+
 class UserCreateForm(forms.ModelForm):
     """Admin-only direct user creation form (existing)."""
     password = forms.CharField(widget=forms.PasswordInput)

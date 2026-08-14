@@ -9,6 +9,10 @@ urlpatterns = [
     path('register/', views.register_view, name='register'),
     path('logout/', views.logout_view, name='logout'),
 
+    # All authenticated users — profile & password
+    path('profile/', views.profile_edit, name='profile_edit'),
+    path('profile/change-password/', views.change_password, name='change_password'),
+
     # System Administrator — user management
     path('users/', views.user_list, name='user_list'),
     path('users/create/', views.user_create, name='user_create'),

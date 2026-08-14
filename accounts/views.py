@@ -1,10 +1,11 @@
-from django.contrib.auth import authenticate, login, logout
+from django.contrib.auth import authenticate, login, logout, update_session_auth_hash
 from django.contrib.auth.decorators import login_required
+from django.contrib.auth.forms import PasswordChangeForm
 from django.contrib import messages
 from django.shortcuts import render, redirect, get_object_or_404
 
 from .decorators import manager_required, superuser_required
-from .forms import UserCreateForm, RegistrationForm
+from .forms import UserCreateForm, RegistrationForm, ProfileEditForm
 from .models import User, Role
 
 
@@ -159,6 +160,45 @@ def user_create(request):
     else:
         form = UserCreateForm()
     return render(request, 'accounts/user_form.html', {'form': form})
+
+
+# ─── My Profile / Account Settings ───────────────────────────────────────────
+
+@login_required
+def profile_edit(request):
+    """Any authenticated user can update their own first name, last name, and email."""
+    if request.method == 'POST':
+        form = ProfileEditForm(request.POST, instance=request.user)
+        if form.is_valid():
+            form.save()
+            messages.success(request, 'Your profile has been updated successfully.')
+            return redirect('accounts:profile_edit')
+        else:
+            messages.error(request, 'Please correct the errors below.')
+    else:
+        form = ProfileEditForm(instance=request.user)
+
+    return render(request, 'accounts/profile_edit.html', {'form': form})
+
+
+@login_required
+def change_password(request):
+    """Any authenticated user can change their own password.
+    Uses update_session_auth_hash so the session remains valid after the change.
+    """
+    if request.method == 'POST':
+        form = PasswordChangeForm(user=request.user, data=request.POST)
+        if form.is_valid():
+            form.save()
+            update_session_auth_hash(request, form.user)
+            messages.success(request, 'Your password has been changed successfully.')
+            return redirect('accounts:profile_edit')
+        else:
+            messages.error(request, 'Please correct the errors below.')
+    else:
+        form = PasswordChangeForm(user=request.user)
+
+    return render(request, 'accounts/change_password.html', {'form': form})
 
 
 # ─── Helpers ──────────────────────────────────────────────────────────────────
